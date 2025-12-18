@@ -2,7 +2,7 @@ name: Check Passport Queue
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # кожні 30 хвилин
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -34,4 +34,3 @@ jobs:
         run: |
           echo "----- Вміст page.html -----"
           cat page.html || echo "Файл page.html не знайдено"
-
