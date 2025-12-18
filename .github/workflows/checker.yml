@@ -34,3 +34,8 @@ jobs:
         run: |
           echo "----- Вміст page.html -----"
           cat page.html || echo "Файл page.html не знайдено"
+- name: Show page HTML (для діагностики)
+  if: always()
+  run: |
+    echo "----- Вміст page.html -----"
+    cat page.html || echo "Файл page.html не знайдено"

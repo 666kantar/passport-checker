@@ -7,7 +7,6 @@ import time
 import os
 import pickle
 
-# 🔐 Отримання секретів з середовища
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -15,7 +14,6 @@ if not BOT_TOKEN or not CHAT_ID:
     print("❌ Не передано TELEGRAM_BOT_TOKEN або TELEGRAM_CHAT_ID")
     exit(1)
 
-# Налаштування Chrome
 options = uc.ChromeOptions()
 options.headless = True
 options.add_argument("--headless=new")
@@ -28,13 +26,12 @@ options.add_argument("--window-size=1920,1080")
 
 try:
     with uc.Chrome(options=options) as driver:
-        wait = WebDriverWait(driver, 40)
+        wait = WebDriverWait(driver, 60)
 
         print("🚀 Відкриваємо сайт для встановлення cookies...")
         driver.get("https://pasport.org.ua")
         time.sleep(3)
 
-        # Завантаження cookies
         try:
             with open("cookies.pkl", "rb") as f:
                 cookies = pickle.load(f)
@@ -48,6 +45,15 @@ try:
         print("🌐 Переходимо на сторінку черги")
         driver.get("https://pasport.org.ua/solutions/e-queue")
         time.sleep(5)
+
+        # Збереження HTML для діагностики
+        with open("page.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
+            print("💾 Збережено page.html для діагностики")
+
+        # Перевірка на CAPTCHA
+        if "cf-turnstile" in driver.page_source or "Cloudflare" in driver.page_source or "Attention Required!" in driver.title:
+            raise Exception("Cloudflare still blocking — cookies may be expired")
 
         print("🌍 Вибираємо країну 'Канада'")
         country_select = wait.until(EC.presence_of_element_located((By.ID, "country")))
@@ -78,7 +84,6 @@ try:
 
         print("📋 Статус:", status)
 
-        # Надсилання повідомлення у Telegram
         message = f"📢 Статус запису: {status}"
         response = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
@@ -90,7 +95,6 @@ try:
         else:
             print("⚠️ Помилка надсилання у Telegram:", response.text)
 
-        # Повідомлення про успішне завершення
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
             data={"chat_id": CHAT_ID, "text": "✅ Скрипт завершився успішно (з cookies)"}
