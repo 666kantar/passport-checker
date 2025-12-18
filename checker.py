@@ -5,17 +5,17 @@ from selenium.webdriver.support import expected_conditions as EC
 import requests
 import time
 import os
+import pickle
 
 # 🔐 Отримання секретів з середовища
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Перевірка наявності секретів
 if not BOT_TOKEN or not CHAT_ID:
     print("❌ Не передано TELEGRAM_BOT_TOKEN або TELEGRAM_CHAT_ID")
     exit(1)
 
-# Налаштування Chrome для headless-режиму на GitHub Actions
+# Налаштування Chrome
 options = uc.ChromeOptions()
 options.headless = True
 options.add_argument("--headless=new")
@@ -30,21 +30,28 @@ try:
     with uc.Chrome(options=options) as driver:
         wait = WebDriverWait(driver, 40)
 
-        print("🚀 Відкриваємо сайт...")
+        print("🚀 Відкриваємо сайт для встановлення cookies...")
+        driver.get("https://pasport.org.ua")
+        time.sleep(3)
+
+        # Завантаження cookies
+        try:
+            with open("cookies.pkl", "rb") as f:
+                cookies = pickle.load(f)
+                for cookie in cookies:
+                    driver.add_cookie(cookie)
+            print("🍪 Cookies завантажено")
+        except Exception as e:
+            print("⚠️ Не вдалося завантажити cookies:", repr(e))
+            raise Exception("Cookies not found or invalid")
+
+        print("🌐 Переходимо на сторінку черги")
         driver.get("https://pasport.org.ua/solutions/e-queue")
         time.sleep(5)
 
-        # 🔍 Перевірка на CAPTCHA або Cloudflare
-        if "cf-turnstile" in driver.page_source or "Cloudflare" in driver.page_source or "Attention Required!" in driver.title:
-            print("🛑 CAPTCHA або Cloudflare Challenge виявлено")
-            raise Exception("Cloudflare block detected")
-
         print("🌍 Вибираємо країну 'Канада'")
-        try:
-            country_select = wait.until(EC.presence_of_element_located((By.ID, "country")))
-            Select(country_select).select_by_visible_text("Канада")
-        except:
-            raise Exception("❌ Елемент #country не знайдено — можливо, CAPTCHA або зміни на сайті")
+        country_select = wait.until(EC.presence_of_element_located((By.ID, "country")))
+        Select(country_select).select_by_visible_text("Канада")
         time.sleep(2)
 
         print("🏢 Вибираємо центр")
@@ -71,7 +78,7 @@ try:
 
         print("📋 Статус:", status)
 
-        # 📬 Надсилання повідомлення у Telegram
+        # Надсилання повідомлення у Telegram
         message = f"📢 Статус запису: {status}"
         response = requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
@@ -83,21 +90,18 @@ try:
         else:
             print("⚠️ Помилка надсилання у Telegram:", response.text)
 
-        # ✅ Повідомлення про успішне завершення
-        test_message = "✅ Скрипт завершився успішно (навіть якщо слотів немає)"
+        # Повідомлення про успішне завершення
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": CHAT_ID, "text": test_message}
+            data={"chat_id": CHAT_ID, "text": "✅ Скрипт завершився успішно (з cookies)"}
         )
 
 except Exception as e:
     print("❌ Помилка виконання:", repr(e))
-    # Надсилаємо повідомлення про помилку
-    error_message = f"❗️ Помилка в скрипті: {repr(e)}"
     try:
         requests.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data={"chat_id": CHAT_ID, "text": error_message}
+            data={"chat_id": CHAT_ID, "text": f"❗️ Помилка в скрипті: {repr(e)}"}
         )
     except:
         print("⚠️ Не вдалося надіслати повідомлення про помилку у Telegram")
